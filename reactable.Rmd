@@ -1,0 +1,221 @@
+---
+title: "reactable"
+author: "Anna Caderon"
+date: "6/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE, message=FALSE, echo=FALSE}
+#install.packages("reactable")
+library(medicaldata)
+library(tidyverse)
+library(reshape2)
+library(forcats)
+library(htmltools)
+```
+
+
+```{r}
+all_variables <- opt %>% 
+  select(PID, Group, Age, Black, White, Nat.Am, Asian, Hisp, Education, N.prev.preg, Live.PTB, Spont.ab, Induced.ab, Any.stillbirth, Diabetes, Hypertension, Drug.Add, Use.Alc, N.qualifying.teeth, N.extractions, BL..BOP, BL..PD.4)
+
+```
+
+```{r}
+
+## cannot find gestational age 
+## could not find eating disorder var
+## total - N.extractions = number of teeth 
+
+age <- all_variables %>% 
+  select(PID, Group, Age) %>%
+  mutate(Group2 = Group, Age2 = Age) %>% 
+  pivot_wider(names_from = Group,
+              values_from = Age)  %>% 
+  mutate(p_value = round((t.test(C,T)$p.value), 2)) %>% 
+  select(-c(PID, C, T)) %>% 
+  group_by(Group2) %>% 
+  summarise(age_mean = round(mean(Age2), 1), p_value = p_value) %>% 
+  ungroup() %>% 
+  mutate(row = row_number()) %>%
+  pivot_wider(names_from = Group2,
+              values_from = age_mean) %>%
+  select(-row) %>% 
+  summarise(across(everything(), mean, na.rm = TRUE)) %>% 
+  mutate(Characteristic1 = rep("Age")) %>%
+  select(Characteristic1, C, T, everything()) %>%
+  mutate(Characteristic = rep("Age")) %>% 
+  select(Characteristic1, Characteristic, everything()) %>% 
+  mutate(Characteristic1 = rep("Age — yr"))
+
+age
+```
+
+
+```{r}
+
+race_eth <- all_variables %>% 
+  select(PID, Group, Black, White, Nat.Am, Asian, Hisp) %>% 
+  mutate(Hisp = ifelse(
+    Hisp == "Yes", "Yes", "No"
+  )) %>% 
+  pivot_longer(3:7, names_to = "race_eth") %>% 
+  #pivot_wider(names_from = Group, values_from = value) %>% 
+  select(-PID) %>% 
+  mutate(Characteristic1 = case_when(
+    race_eth == "Black" | race_eth == "White" | race_eth == "Nat.Am" | 
+      race_eth == "Asian" ~ "Race",
+    race_eth == "Hisp" ~ "Ethnicity"
+  )) %>% 
+  select(Characteristic1, everything()) %>% 
+  group_by(Group, Characteristic1, race_eth, value) %>% 
+  count() %>% 
+  ungroup() %>% 
+  group_by(Group, race_eth) %>% 
+  mutate(freq = n/sum(n)) %>% 
+  # pivot_wider(names_from = Group,
+  #              values_from = n)  %>% 
+  filter(race_eth == "Hisp" | race_eth == "Black" | race_eth == "White") %>% 
+  filter(value == "Yes") %>% 
+  select(Group, Characteristic1, race_eth, n, freq) %>% 
+  mutate(final_values = paste0(n, " (", round((freq*100), 1), ")")) %>% 
+  mutate(p_value = case_when(
+    race_eth == "Hisp" ~ chisq.test(all_variables$Hisp, all_variables$Group, correct = FALSE)$p.value,
+    race_eth == "Black" ~ chisq.test(all_variables$Black, all_variables$Group, correct = FALSE)$p.value,
+    race_eth == "White" ~ chisq.test(all_variables$White, all_variables$Group, correct = FALSE)$p.value
+  )) %>% 
+  select(-n, -freq) %>% 
+  pivot_wider(names_from = Group,
+              values_from = final_values) %>%
+  ungroup() %>% 
+  rename(Characteristic = race_eth) 
+
+race_eth <- race_eth %>% 
+  mutate(Characteristic1 = rep("Race or ethnic group — no. (%) †")) %>% 
+  select(Characteristic1, Characteristic,C,T, p_value) %>% 
+  mutate(Characteristic = case_when(
+    Characteristic == "Hisp"~ "Hispanic",
+    Characteristic == "Black" ~ "Black",
+    Characteristic == "White" ~ "White"
+  ))
+race_eth
+```
+
+```{r}
+#notice there is a space after yrs in some levels 
+# p-value was not calculated in the pipeline - is was added as a vector. 
+
+edu <- all_variables %>% 
+  select(Group, Education) %>% 
+  group_by(Group, Education) %>% 
+  mutate(Characteristic = case_when(
+    Education == "LT 8 yrs " ~  "≤8 yr",
+    Education == "8-12 yrs " ~ "9-12 yr",
+    Education == "MT 12 yrs" ~ ">12 yr"
+  )) %>% 
+  ungroup() %>% 
+  select(Group, Characteristic) %>% 
+  mutate(Characteristic = fct_relevel(Characteristic, "≤8 yr", "9-12 yr", ">12 yr")) %>% 
+  group_by(Group, Characteristic) %>% 
+  count() %>% 
+  ungroup() %>% 
+  group_by(Group) %>% 
+  mutate(freq = n/sum(n)) %>% 
+  mutate(final_values = paste0(n, " (", round((freq*100), 1), ")")) %>% 
+  mutate(p_value = NA) %>% 
+  select(-n, -freq) %>% 
+  pivot_wider(names_from = Group,
+              values_from = final_values) %>%
+  ungroup() %>% 
+  mutate(Characteristic1 = rep("Education")) %>% 
+  select(Characteristic1, Characteristic, C, T, p_value) %>% 
+  mutate(Characteristic1 = rep("Education — no. (%)"))
+
+
+edu
+```
+
+```{r}
+# did not find gestational age in the dataset
+
+Characteristic1 <- c("Mean gestational age of fetus — wk")
+Characteristic <- c("Mean gestational age of fetus — wk")
+C <- c("15.0±13")
+T <- c("15.0±1.3")
+p_value <- c("0.85")
+
+
+
+fetus_age <- data.frame(Characteristic1, Characteristic, C, T, p_value)
+
+fetus_age
+```
+
+
+```{r}
+prev_preg <-  all_variables %>% 
+  select(PID, Group, N.prev.preg, Live.PTB, Spont.ab, Induced.ab, Any.stillbirth)
+
+```
+
+```{css. echo=FALSE}
+.noParenthesis .rt-expandable > div {
+  height: 21px;
+  display: -webkit-inline-box;
+}
+
+.noParenthesis .rt-expandable > div > span {
+    display: table-caption;
+    color: transparent;
+}
+
+.noParenthesis .rt-expandable > div > span:first-line {
+    color: #333333;
+}
+```
+
+```{r}
+table_data <- rbind(age,race_eth, edu, fetus_age)
+
+table_data <- table_data %>% 
+rename(`Control Group (N=410)` = C,
+         `Treatment Group (N=413)` = T,
+         `P Value` = p_value)
+
+#remotes::install_github("glin/reactable")
+
+reactable::reactable(table_data,
+                     groupBy = "Characteristic1",
+                     highlight = TRUE,
+                     #defaultColDef = colDef(headerClass = "noParenthesis"),
+                     columns = list(
+                       Characteristic1 = reactable::colDef (show = FALSE, width = 150),
+                       Characteristic = reactable::colDef(align = "center")
+
+                     )
+                     )
+
+# htmltools::browsable(
+#   tagList(
+#     tags$button(
+#       "Expand/collapse all",
+#       onclick = "Reactable.toggleAllRowsExpanded('cars-expansion-table')"
+#     ),
+# 
+#    reactable::reactable(
+#       table_data,
+#       defaultColDef = colDef(show = F),
+#       groupBy = "Characteristic1",
+#       defaultPageSize = 5,
+#       elementId = "expansion-table"
+# 
+#     )
+#   )
+# )
+```
+
