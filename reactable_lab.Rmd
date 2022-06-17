@@ -1,0 +1,115 @@
+---
+title: "Reactable Lab"
+author: "Anna Caderon"
+date: "6/15/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(kableExtra)
+library(knitr)
+library(scales)
+```
+
+```{css, echo = FALSE}
+.table caption {
+    color: black;
+    font-weight: bold;
+}
+```
+
+```{r, results = 'asis', fig.pos='!h'}
+pop <- read_excel("Population by Year by County.xlsx", skip = 3)
+
+pop %>% 
+  dplyr::rename(" " = "Year") %>% 
+  knitr::kable(caption = '<b>Population by County by Year</b>', 
+               format = 'html',
+               escape = FALSE,) %>% 
+  kable_styling(bootstrap_options = "bordered",
+                full_width = FALSE) %>% 
+  column_spec(c(1,7), bold=T) %>% 
+  row_spec(68, bold=T) %>% 
+  add_header_above(c(" ", "Population" = 6), align = "left") %>% 
+  scroll_box(width = "700px", height = "500px", fixed_thead = F)
+
+```
+
+```{r}
+pop2 <- pop
+pop2[,2:7] <- lapply(pop2[,2:7], function(x){
+    as.numeric(as.character(gsub(",", "", x)))
+  })
+
+
+
+react_data <- pop2 %>% 
+  dplyr::select(-Total) %>% 
+  dplyr::filter(`2016` != 20231092) %>% 
+  dplyr::rename("County" = "Year") %>% 
+  pivot_longer(2:6,names_to = "Year", values_to = "Population") %>% 
+  group_by(County) %>% 
+  arrange(Year) %>%
+  mutate(`Population Difference by Year` = Population - lag(Population, default = first(Population))) %>% 
+  ungroup() %>% 
+  arrange(County, Year)
+
+
+htmltools::browsable(
+  htmltools::tagList(
+    htmltools::tags$button(
+      "Expand/collapse all",
+      onclick = "Reactable.toggleAllRowsExpanded('population-expansion-table')"
+    ),
+
+    reactable::reactable(
+      react_data,
+  groupBy = "County",
+  columns = list(
+    County = reactable::colDef(footer = "Total"),
+    Year = reactable::colDef(aggregate = "count",
+                             format = list(
+                               aggregated = reactable::colFormat(suffix = " years (2016-2020)"))),
+    Population = reactable::colDef(filterable = FALSE,
+                                   aggregate = "mean",
+                                   footer = function(values) comma(sum(values)),
+                                   format = list(
+                                     aggregated = reactable::colFormat(prefix = "Average population of "))
+                                   ),
+    `Population Difference by Year` = reactable::colDef(filterable = FALSE,
+                                    footer = function(values) comma(sum(values)))),
+  defaultColDef = reactable::colDef(
+    footerStyle = list(fontWeight = "bold"),
+    minWidth = 110,
+    format = reactable::colFormat(separators = TRUE)
+    ),
+  bordered = FALSE,
+  highlight = TRUE,
+  filterable = TRUE,
+  #searchable = TRUE,
+  elementId = "population-expansion-table", ####
+  theme = reactable::reactableTheme(
+    borderColor = "#dfe2e5",
+    stripedColor = "#f6f8fa",
+    highlightColor = "#f0f5f9",
+    cellPadding = "8px 12px",
+    style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"),
+    #searchInputStyle = list(width = "100%")
+  )
+    )
+  )
+)
+
+
+```
+
+```{r}
+
+```
+

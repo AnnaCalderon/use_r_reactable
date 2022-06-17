@@ -184,20 +184,22 @@ table_data <- rbind(age,race_eth, edu, fetus_age)
 
 table_data <- table_data %>% 
 rename(`Control Group (N=410)` = C,
-         `Treatment Group (N=413)` = T,
-         `P Value` = p_value)
+       `Treatment Group (N=413)` = T,
+       `P Value` = p_value,
+       ` ` = Characteristic,
+       `Characteristic` = Characteristic1) 
+  
 
 #remotes::install_github("glin/reactable")
 
 reactable::reactable(table_data,
-                     groupBy = "Characteristic1",
+                     groupBy = "Characteristic",
                      highlight = TRUE,
-                     #defaultColDef = colDef(headerClass = "noParenthesis"),
+                     defaultColDef = reactable::colDef(align = "center"),
                      columns = list(
-                       Characteristic1 = reactable::colDef (show = FALSE, width = 150),
-                       Characteristic = reactable::colDef(align = "center")
-
-                     )
+                       Characteristic = reactable::colDef (width = 150)
+                       #Characteristic = reactable::colDef(align = "center")
+                       )
                      )
 
 # htmltools::browsable(
